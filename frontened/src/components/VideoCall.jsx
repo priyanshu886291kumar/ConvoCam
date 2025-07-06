@@ -2,6 +2,8 @@ import React, { useRef, useEffect, useState } from "react";
 import io from "socket.io-client";
 
 const socket = io("http://localhost:5001");
+// const socket = io("https://c7d3-2409-40e5-11e6-731b-1878-7d8-9556-91d9.ngrok-free.app");
+
 
 const VideoCall = ({ currentUser, remoteUser, onClose }) => {
   const localVideo = useRef();
@@ -20,8 +22,11 @@ const VideoCall = ({ currentUser, remoteUser, onClose }) => {
     navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
       localVideo.current.srcObject = stream;
       localStream = stream;
-      peerConnection.current = new RTCPeerConnection();
-
+peerConnection.current = new RTCPeerConnection({
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" }
+  ]
+});
       stream.getTracks().forEach(track => peerConnection.current.addTrack(track, stream));
 
       peerConnection.current.ontrack = event => {
@@ -68,7 +73,7 @@ const VideoCall = ({ currentUser, remoteUser, onClose }) => {
           socket.emit("offer", { offer, roomId });
         };
       }
-    });
+    })
 
     return () => {
       if (localVideo.current && localVideo.current.srcObject) {

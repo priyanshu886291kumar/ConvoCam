@@ -1,10 +1,3 @@
-// import React from 'react'
-
-// export const HomePage = () => {
-//   return (
-//     <div>HomePage</div>
-//   )
-// }
 
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";

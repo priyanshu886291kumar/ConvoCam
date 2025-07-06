@@ -48,7 +48,7 @@ import { Video } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 
-const ChatHeader = ({ selectedUser, onlineUsers }) => {
+const ChatHeader = ({ selectedUser, onlineUsers,onVideoCall }) => {
   const navigate = useNavigate();
 
   // Format last seen like WhatsApp
@@ -81,7 +81,8 @@ const ChatHeader = ({ selectedUser, onlineUsers }) => {
       <button
         className="btn btn-circle btn-ghost"
         title="Start Video Call"
-        onClick={() => navigate(`/call/${selectedUser._id}`)}//*************** */
+        // onClick={() => navigate(`/call/${selectedUser._id}`)}//*************** */
+        onClick={onVideoCall}
       >
         <Video className="w-6 h-6" />
       </button>
