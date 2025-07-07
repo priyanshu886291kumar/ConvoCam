@@ -1,5 +1,322 @@
 
 
+// import { useEffect, useRef, useState } from "react";
+// import { useChatStore } from "../store/useChatStore";
+// import useAuthUser from "../hooks/useAuthUser";
+// import { useSocket } from "../hooks/useSocket";
+// import { useParams } from "react-router";
+// import { axiosInstance } from "../lib/axios";
+// import ChatHeader from "./ChatHeader";
+// import VideoCall from "./VideoCall";
+// import { Mic, MicOff, Send, Paperclip } from "lucide-react";
+
+// const ChatContainer = () => {
+//   const { id: selectedUserId } = useParams();
+//   const { authUser: currentUser } = useAuthUser();
+//   const socket = useSocket(currentUser?._id);
+
+//   const {
+//     messages,
+//     isMessagesLoading,
+//     setSelectedUser,
+//     selectedUser,
+//     getMessages,
+//     addMessage,
+//   } = useChatStore();
+
+//   const [input, setInput] = useState("");
+//   const [file, setFile] = useState(null);
+//   const [showVideoCall, setShowVideoCall] = useState(false);
+//   const [isListening, setIsListening] = useState(false);
+//   const [isFriendTyping, setIsFriendTyping] = useState(false);
+//   const [smartReplies, setSmartReplies] = useState([]); // ✅ Gemini smart replies
+
+//   const recognitionRef = useRef(null);
+//   const messagesEndRef = useRef(null);
+//   const typingTimeoutRef = useRef(null);
+
+//   const handleFileChange = (e) => setFile(e.target.files[0]);
+
+//   const uploadFile = async () => {
+//     if (!file) return null;
+//     const formData = new FormData();
+//     formData.append("file", file);
+//     const res = await fetch("http://localhost:5001/api/upload", {
+//       method: "POST",
+//       body: formData,
+//     });
+//     const data = await res.json();
+//     setFile(null);
+//     return data.url;
+//   };
+
+//   const sendMessage = async () => {
+//     if ((input.trim() || file) && currentUser && selectedUser) {
+//       let fileUrl = null;
+//       if (file) fileUrl = await uploadFile();
+
+//       socket.emit("sendMessage", {
+//         senderId: currentUser._id,
+//         receiverId: selectedUser._id,
+//         text: input,
+//         file: fileUrl,
+//       });
+
+//       setInput("");
+//       setFile(null);
+//       setSmartReplies([]); // ✅ Clear suggestions
+
+//       socket.emit("typing", {
+//         senderId: currentUser._id,
+//         receiverId: selectedUser._id,
+//         isTyping: false,
+//       });
+//     }
+//   };
+
+//   const toggleListening = () => {
+//     const SpeechRecognition =
+//       window.SpeechRecognition || window.webkitSpeechRecognition;
+
+//     if (!SpeechRecognition) {
+//       alert("Speech Recognition is not supported in this browser.");
+//       return;
+//     }
+
+//     if (!recognitionRef.current) {
+//       const recognition = new SpeechRecognition();
+//       recognition.lang = "en-US";
+//       recognition.interimResults = false;
+//       recognition.maxAlternatives = 1;
+
+//       recognition.onresult = (event) => {
+//         const transcript = event.results[0][0].transcript;
+//         setInput((prev) => prev + " " + transcript);
+//       };
+
+//       recognition.onerror = (event) => {
+//         console.error("Speech recognition error:", event.error);
+//         setIsListening(false);
+//       };
+
+//       recognition.onend = () => {
+//         if (isListening) recognition.start();
+//       };
+
+//       recognitionRef.current = recognition;
+//     }
+
+//     if (isListening) {
+//       recognitionRef.current.stop();
+//       setIsListening(false);
+//     } else {
+//       recognitionRef.current.start();
+//       setIsListening(true);
+//     }
+//   };
+
+//   const handleInputChange = (e) => {
+//     setInput(e.target.value);
+//     if (socket && currentUser && selectedUser) {
+//       socket.emit("typing", {
+//         senderId: currentUser._id,
+//         receiverId: selectedUser._id,
+//         isTyping: true,
+//       });
+//       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+//       typingTimeoutRef.current = setTimeout(() => {
+//         socket.emit("typing", {
+//           senderId: currentUser._id,
+//           receiverId: selectedUser._id,
+//           isTyping: false,
+//         });
+//       }, 1500);
+//     }
+//   };
+
+//   useEffect(() => {
+//     if (!selectedUserId) return;
+//     axiosInstance.get(`/users/${selectedUserId}`).then((res) => {
+//       setSelectedUser(res.data);
+//     });
+//   }, [selectedUserId, setSelectedUser]);
+
+//   useEffect(() => {
+//     if (currentUser && selectedUser) getMessages(currentUser._id);
+//   }, [currentUser, selectedUser, getMessages]);
+
+//   useEffect(() => {
+//     if (!socket) return;
+
+//     const handleReceive = async (msg) => {
+//       if (
+//         (msg.senderId === currentUser._id && msg.receiverId === selectedUser?._id) ||
+//         (msg.senderId === selectedUser?._id && msg.receiverId === currentUser._id)
+//       ) {
+//         addMessage(msg);
+
+//         // ✅ Fetch Gemini suggestions only if friend sent the message
+//         if (msg.senderId === selectedUser?._id && msg.text) {
+//           try {
+//             const res = await fetch("http://localhost:5001/api/gemini/suggest-replies", {
+//               method: "POST",
+//               headers: { "Content-Type": "application/json" },
+//               body: JSON.stringify({ message: msg.text }),
+//             });
+//             const data = await res.json();
+//             setSmartReplies(data.suggestions || []);
+//           } catch (err) {
+//             console.error("Smart reply fetch error:", err);
+//           }
+//         }
+//       }
+//     };
+
+//     const handleTyping = ({ senderId, isTyping }) => {
+//       if (senderId === selectedUser?._id) setIsFriendTyping(isTyping);
+//     };
+
+//     socket.on("receiveMessage", handleReceive);
+//     socket.on("typing", handleTyping);
+
+//     return () => {
+//       socket.off("receiveMessage", handleReceive);
+//       socket.off("typing", handleTyping);
+//     };
+//   }, [socket, currentUser, selectedUser, addMessage]);
+
+//   const handleVideoCall = () => {
+//     socket.emit("call-user", { from: currentUser._id, to: selectedUser._id });
+//     setShowVideoCall(true);
+//   };
+
+//   useEffect(() => {
+//     if (!socket) return;
+//     const handleIncomingCall = ({ from }) => {
+//       if (selectedUser && from === selectedUser._id) setShowVideoCall(true);
+//     };
+//     socket.on("incoming-call", handleIncomingCall);
+//     return () => socket.off("incoming-call", handleIncomingCall);
+//   }, [socket, selectedUser]);
+
+//   useEffect(() => {
+//     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+//   }, [messages]);
+
+//   if (!currentUser || !selectedUser) return null;
+
+//   return (
+//     <div className="flex-1 flex flex-col overflow-hidden bg-base-100">
+//       <div className="relative flex flex-col h-full">
+//         {/* Chat Header */}
+//         <div className="sticky top-0 z-20 bg-base-100 border-b border-base-300">
+//           <ChatHeader selectedUser={selectedUser} onVideoCall={handleVideoCall} />
+//         </div>
+
+//         {/* Chat Messages */}
+//         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-base-100">
+//           {isMessagesLoading ? (
+//             <div>⏳ Loading...</div>
+//           ) : messages.length > 0 ? (
+//             <>
+//               {messages.map((message, idx) => (
+//                 <div
+//                   key={message._id || idx}
+//                   className={`flex ${
+//                     message.senderId === currentUser._id ? "justify-end" : "justify-start"
+//                   }`}
+//                   ref={idx === messages.length - 1 ? messagesEndRef : null}
+//                 >
+//                   <div
+//                     className={`rounded-lg px-4 py-2 max-w-xs break-words shadow ${
+//                       message.senderId === currentUser._id
+//                         ? "bg-green-200 text-black"
+//                         : "bg-white text-black"
+//                     }`}
+//                   >
+//                     {message.text && <span>{message.text}</span>}
+//                     {message.file && (
+//                       <a href={message.file} target="_blank" rel="noopener noreferrer">
+//                         {message.file.match(/\.(jpg|jpeg|png|gif)$/i) ? (
+//                           <img src={message.file} alt="file" style={{ maxWidth: 200, marginTop: 8 }} />
+//                         ) : (
+//                           <span className="text-blue-500 underline block mt-2">📎 Download file</span>
+//                         )}
+//                       </a>
+//                     )}
+//                     <span className="block text-xs text-right mt-1">
+//                       {new Date(message.createdAt).toLocaleTimeString([], {
+//                         hour: "2-digit",
+//                         minute: "2-digit",
+//                       })}
+//                     </span>
+//                   </div>
+//                 </div>
+//               ))}
+//               {isFriendTyping && (
+//                 <div className="text-sm text-gray-500 mt-2">
+//                   {selectedUser.fullName} is typing...
+//                 </div>
+//               )}
+//             </>
+//           ) : (
+//             <div>💬 No messages yet.</div>
+//           )}
+//         </div>
+
+//         {/* ✅ Smart Reply Suggestions */}
+//         {smartReplies.length > 0 && (
+//           <div className="p-2 flex gap-2 bg-base-100 border-t border-base-300 overflow-x-auto">
+//             {smartReplies.map((reply, idx) => (
+//               <button
+//                 key={idx}
+//                 className="btn btn-sm btn-outline"
+//                 onClick={() => {
+//                   setInput(reply);
+//                   setSmartReplies([]);
+//                 }}
+//               >
+//                 {reply}
+//               </button>
+//             ))}
+//           </div>
+//         )}
+
+//         {/* Input section */}
+//         <div className="p-2 border-t border-base-300 flex gap-2 bg-base-100 items-center">
+//           <input type="file" onChange={handleFileChange} className="file-input file-input-bordered" />
+//           <input
+//             className="input input-bordered flex-1"
+//             value={input}
+//             onChange={handleInputChange}
+//             onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+//             placeholder="Type a message"
+//           />
+//           <button
+//             className={`btn ${isListening ? "btn-error" : "btn-secondary"}`}
+//             onClick={toggleListening}
+//             title={isListening ? "Stop listening" : "Start voice typing"}
+//           >
+//             {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+//           </button>
+//           <button className="btn btn-primary" onClick={sendMessage} title="Send message">
+//             <Send className="w-4 h-4" />
+//           </button>
+//         </div>
+
+//         {showVideoCall && (
+//           <VideoCall
+//             currentUser={currentUser}
+//             remoteUser={selectedUser}
+//             onClose={() => setShowVideoCall(false)}
+//           />
+//         )}
+//       </div>
+//     </div>
+//   );
+// };
+
+// export default ChatContainer;
 
 
 
@@ -29,20 +346,58 @@
 //   } = useChatStore();
 
 //   const [input, setInput] = useState("");
+//   const [file, setFile] = useState(null);
 //   const [showVideoCall, setShowVideoCall] = useState(false);
 //   const [isListening, setIsListening] = useState(false);
 //   const [isFriendTyping, setIsFriendTyping] = useState(false);
+//   const [smartReplies, setSmartReplies] = useState([]);
+//   const [translationLanguage, setTranslationLanguage] = useState("english");
+// // Add this state to store translations by message ID
+// const [translations, setTranslations] = useState({});
+//   const [translatedText, setTranslatedText] = useState("");
+
 //   const recognitionRef = useRef(null);
 //   const messagesEndRef = useRef(null);
 //   const typingTimeoutRef = useRef(null);
 
-//   // --- Voice-to-text toggle ---
+//   const handleFileChange = (e) => setFile(e.target.files[0]);
+
+//   const uploadFile = async () => {
+//     if (!file) return null;
+//     const formData = new FormData();
+//     formData.append("file", file);
+//     const res = await fetch("http://localhost:5001/api/upload", {
+//       method: "POST",
+//       body: formData,
+//     });
+//     const data = await res.json();
+//     setFile(null);
+//     return data.url;
+//   };
+
+//   const sendMessage = async () => {
+//     if ((input.trim() || file) && currentUser && selectedUser) {
+//       let fileUrl = null;
+//       if (file) fileUrl = await uploadFile();
+
+//       socket.emit("sendMessage", {
+//         senderId: currentUser._id,
+//         receiverId: selectedUser._id,
+//         text: input,
+//         file: fileUrl,
+//       });
+
+//       setInput("");
+//       setFile(null);
+//       setSmartReplies([]);
+//     }
+//   };
+
 //   const toggleListening = () => {
 //     const SpeechRecognition =
 //       window.SpeechRecognition || window.webkitSpeechRecognition;
-
 //     if (!SpeechRecognition) {
-//       alert("Speech Recognition is not supported in this browser.");
+//       alert("Speech Recognition not supported.");
 //       return;
 //     }
 
@@ -52,18 +407,14 @@
 //       recognition.interimResults = false;
 //       recognition.maxAlternatives = 1;
 
-//       recognition.onresult = (event) => {
-//         const transcript = event.results[0][0].transcript;
+//       recognition.onresult = (e) => {
+//         const transcript = e.results[0][0].transcript;
 //         setInput((prev) => prev + " " + transcript);
 //       };
 
-//       recognition.onerror = (event) => {
-//         console.error("Speech recognition error:", event.error);
-//         setIsListening(false);
-//       };
-
+//       recognition.onerror = () => setIsListening(false);
 //       recognition.onend = () => {
-//         if (isListening) recognition.start(); // keep listening
+//         if (isListening) recognition.start();
 //       };
 
 //       recognitionRef.current = recognition;
@@ -78,7 +429,6 @@
 //     }
 //   };
 
-//   // --- Emit typing event ---
 //   const handleInputChange = (e) => {
 //     setInput(e.target.value);
 //     if (socket && currentUser && selectedUser) {
@@ -87,7 +437,6 @@
 //         receiverId: selectedUser._id,
 //         isTyping: true,
 //       });
-//       // Stop typing after 1.5s of inactivity
 //       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 //       typingTimeoutRef.current = setTimeout(() => {
 //         socket.emit("typing", {
@@ -100,62 +449,136 @@
 //   };
 
 //   useEffect(() => {
-//     const fetchUser = async () => {
-//       if (!selectedUserId) return;
-//       const res = await axiosInstance.get(`/users/${selectedUserId}`);
+//     if (!selectedUserId) return;
+//     axiosInstance.get(`/users/${selectedUserId}`).then((res) => {
 //       setSelectedUser(res.data);
-//     };
-//     fetchUser();
+//     });
 //   }, [selectedUserId, setSelectedUser]);
 
 //   useEffect(() => {
 //     if (currentUser && selectedUser) getMessages(currentUser._id);
 //   }, [currentUser, selectedUser, getMessages]);
 
-//   useEffect(() => {
-//     if (!socket) return;
 
-//     const handleReceive = (msg) => {
+// useEffect(() => {
+//   if (!socket) return;
+
+//   const handleReceive = async (msg) => {
+//     const isCurrentChat =
+//       (msg.senderId === currentUser._id && msg.receiverId === selectedUser?._id) ||
+//       (msg.senderId === selectedUser?._id && msg.receiverId === currentUser._id);
+
+//     if (isCurrentChat) {
+//       addMessage(msg);
+
+//       // Only translate the latest incoming message if language is different
 //       if (
-//         (msg.senderId === currentUser._id && msg.receiverId === selectedUser?._id) ||
-//         (msg.senderId === selectedUser?._id && msg.receiverId === currentUser._id)
+//         msg.senderId === selectedUser?._id &&
+//         msg.text &&
+//         translationLanguage !== "english" // skip if same language
 //       ) {
-//         addMessage(msg);
+//         try {
+//           const res = await fetch("http://localhost:5001/api/translate", {
+//             method: "POST",
+//             headers: { "Content-Type": "application/json" },
+//             body: JSON.stringify({ text: msg.text, targetLang: translationLanguage }),
+//           });
+//           const data = await res.json();
+//           setTranslations((prev) => ({
+//             ...prev,
+//             [msg._id]: data.translated || "",
+//           }));
+//         } catch (err) {
+//           console.error("Translation error:", err);
+//         }
 //       }
-//     };
-
-//     // --- Listen for typing event ---
-//     const handleTyping = ({ senderId, isTyping }) => {
-//       if (senderId === selectedUser?._id) {
-//         setIsFriendTyping(isTyping);
-//       }
-//     };
-
-//     socket.on("receiveMessage", handleReceive);
-//     socket.on("typing", handleTyping);
-
-//     return () => {
-//       socket.off("receiveMessage", handleReceive);
-//       socket.off("typing", handleTyping);
-//     };
-//   }, [socket, currentUser, selectedUser, addMessage]);
-
-//   const sendMessage = () => {
-//     if (input.trim() && currentUser && selectedUser) {
-//       socket.emit("sendMessage", {
-//         senderId: currentUser._id,
-//         receiverId: selectedUser._id,
-//         text: input,
-//       });
-//       setInput("");
-//       // Stop typing indicator immediately after sending
-//       socket.emit("typing", {
-//         senderId: currentUser._id,
-//         receiverId: selectedUser._id,
-//         isTyping: false,
-//       });
 //     }
 //   };
+
+//   const handleTyping = ({ senderId, isTyping }) => {
+//     if (senderId === selectedUser?._id) setIsFriendTyping(isTyping);
+//   };
+
+//   socket.on("receiveMessage", handleReceive);
+//   socket.on("typing", handleTyping);
+
+//   return () => {
+//     socket.off("receiveMessage", handleReceive);
+//     socket.off("typing", handleTyping);
+//   };
+// }, [socket, currentUser, selectedUser, translationLanguage, addMessage]);
+
+
+
+
+
+// //   useEffect(() => {
+// //     if (!socket) return;
+
+// //     const handleReceive = async (msg) => {
+// //           console.log("📩 Received a message:", msg);
+
+// //       const isCurrentChat =
+// //         (msg.senderId === currentUser._id && msg.receiverId === selectedUser?._id) ||
+// //         (msg.senderId === selectedUser?._id && msg.receiverId === currentUser._id);
+
+
+// //             console.log("🧠 isCurrentChat:", isCurrentChat);
+// //             console.log("👤 currentUser:", currentUser?._id);
+// //             console.log("👤 selectedUser:", selectedUser?._id);
+
+
+// //       if (isCurrentChat) {
+// //         addMessage(msg);
+
+// //         if (msg.senderId === selectedUser?._id && msg.text) {
+// //           // Gemini Smart Reply
+// //                   console.log("💬 Friend's message:", msg.text);
+
+// //           try {
+// //             const res = await fetch("http://localhost:5001/api/gemini/suggest-replies", {
+// //               method: "POST",
+// //               headers: { "Content-Type": "application/json" },
+// //               body: JSON.stringify({ message: msg.text }),
+// //             });
+// //             const data = await res.json();
+// //             setSmartReplies(data.suggestions || []);
+// //           } catch (err) {
+// //             console.error("Smart reply error:", err);
+// //           }
+
+// // // In your handleReceive function:
+// // if (msg.senderId === selectedUser?._id && msg.text) {
+// //   if (translationLanguage !== "english") { // or your logic
+// //     try {
+// //       const res = await fetch("http://localhost:5001/api/translate", {
+// //         method: "POST",
+// //         headers: { "Content-Type": "application/json" },
+// //         body: JSON.stringify({ text: msg.text, targetLang: translationLanguage }),
+// //       });
+// //       const data = await res.json();
+// //       setTranslations(prev => ({
+// //         ...prev,
+// //         [msg._id]: data.translated || ""
+// //       }));
+// //     } catch (err) {
+// //       console.error("Translation error:", err);
+// //     }
+// //   }
+// // }
+
+// //     const handleTyping = ({ senderId, isTyping }) => {
+// //       if (senderId === selectedUser?._id) setIsFriendTyping(isTyping);
+// //     };
+
+// //     socket.on("receiveMessage", handleReceive);
+// //     socket.on("typing", handleTyping);
+
+// //     return () => {
+// //       socket.off("receiveMessage", handleReceive);
+// //       socket.off("typing", handleTyping);
+// //     };
+// //   }, [socket, currentUser, selectedUser, translationLanguage]);
 
 //   const handleVideoCall = () => {
 //     socket.emit("call-user", { from: currentUser._id, to: selectedUser._id });
@@ -165,14 +588,10 @@
 //   useEffect(() => {
 //     if (!socket) return;
 //     const handleIncomingCall = ({ from }) => {
-//       if (selectedUser && from === selectedUser._id) {
-//         setShowVideoCall(true);
-//       }
+//       if (selectedUser && from === selectedUser._id) setShowVideoCall(true);
 //     };
 //     socket.on("incoming-call", handleIncomingCall);
-//     return () => {
-//       socket.off("incoming-call", handleIncomingCall);
-//     };
+//     return () => socket.off("incoming-call", handleIncomingCall);
 //   }, [socket, selectedUser]);
 
 //   useEffect(() => {
@@ -184,24 +603,29 @@
 //   return (
 //     <div className="flex-1 flex flex-col overflow-hidden bg-base-100">
 //       <div className="relative flex flex-col h-full">
-//         {/* ✅ Sticky Chat Header */}
+//         {/* Header */}
 //         <div className="sticky top-0 z-20 bg-base-100 border-b border-base-300">
-//           <ChatHeader
-//             selectedUser={selectedUser}
-//             onlineUsers={[]} // replace with real data if needed
-//             onVideoCall={handleVideoCall}
-//           />
+//           <ChatHeader selectedUser={selectedUser} onVideoCall={handleVideoCall} />
 //         </div>
 
-//         {/* ✅ Scrollable Chat Messages */}
-//         <div
-//           className="flex-1 overflow-y-auto p-4 space-y-4 bg-base-100"
-//           onScroll={(e) => {
-//             if (e.target.scrollTop === 0 && !isMessagesLoading) {
-//               // Add pagination logic if needed
-//             }
-//           }}
-//         >
+//         {/* Language Selector */}
+//         <div className="p-2 border-b border-base-300 bg-base-100">
+//           <label className="text-sm mr-2">🌐 Translate to:</label>
+//           <select
+//             className="select select-bordered select-sm"
+//             value={translationLanguage}
+//             onChange={(e) => setTranslationLanguage(e.target.value)}
+//           >
+//             <option value="hindi">Hindi</option>
+//             <option value="english">English</option>
+//             <option value="spanish">Spanish</option>
+//             <option value="bengali">Bengali</option>
+//             <option value="french">French</option>
+//           </select>
+//         </div>
+
+//         {/* Chat Messages */}
+//         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-base-100">
 //           {isMessagesLoading ? (
 //             <div>⏳ Loading...</div>
 //           ) : messages.length > 0 ? (
@@ -210,9 +634,7 @@
 //                 <div
 //                   key={message._id || idx}
 //                   className={`flex ${
-//                     message.senderId === currentUser._id
-//                       ? "justify-end"
-//                       : "justify-start"
+//                     message.senderId === currentUser._id ? "justify-end" : "justify-start"
 //                   }`}
 //                   ref={idx === messages.length - 1 ? messagesEndRef : null}
 //                 >
@@ -223,32 +645,40 @@
 //                         : "bg-white text-black"
 //                     }`}
 //                   >
-//                     <span>{message.text}</span>
+//                    {message.text && (
+//   <div>
+//     <span>{message.text}</span>
+//     {message.senderId === selectedUser._id && translations[message._id] && (
+//       <div className="text-xs text-blue-600 mt-1 italic">
+//         🌐 {translationLanguage.toUpperCase()}: {translations[message._id]}
+//       </div>
+//     )}
+//   </div>
+// )}
+
+//                     {message.file && (
+//                       <a href={message.file} target="_blank" rel="noopener noreferrer">
+//                         {message.file.match(/\.(jpg|jpeg|png|gif)$/i) ? (
+//                           <img src={message.file} alt="file" style={{ maxWidth: 200, marginTop: 8 }} />
+//                         ) : (
+//                           <span className="text-blue-500 underline block mt-2">
+//                             📎 Download file
+//                           </span>
+//                         )}
+//                       </a>
+//                     )}
 //                     <span className="block text-xs text-right mt-1">
 //                       {new Date(message.createdAt).toLocaleTimeString([], {
 //                         hour: "2-digit",
 //                         minute: "2-digit",
 //                       })}
-//                       {message.senderId === currentUser._id && (
-//                         <>
-//                           {message.status === "read" ? (
-//                             <span style={{ color: "#34B7F1", marginLeft: 4 }}>✔✔</span>
-//                           ) : message.status === "delivered" ? (
-//                             <span style={{ color: "#999", marginLeft: 4 }}>✔✔</span>
-//                           ) : (
-//                             <span style={{ color: "#999", marginLeft: 4 }}>✔</span>
-//                           )}
-//                         </>
-//                       )}
 //                     </span>
 //                   </div>
 //                 </div>
 //               ))}
-//               {/* --- Typing indicator --- */}
 //               {isFriendTyping && (
-//                 <div className="flex items-center gap-2 mt-2">
-//                   <span className="text-xs text-gray-500">{selectedUser.fullName} is typing...</span>
-//                   <span className="animate-bounce text-lg">💬</span>
+//                 <div className="text-sm text-gray-500 mt-2">
+//                   {selectedUser.fullName} is typing...
 //                 </div>
 //               )}
 //             </>
@@ -257,16 +687,34 @@
 //           )}
 //         </div>
 
-//         {/* ✅ Input section */}
-//         <div className="p-2 border-t border-base-300 flex gap-2 bg-base-100">
+//         {/* Smart Replies */}
+//         {smartReplies.length > 0 && (
+//           <div className="p-2 flex gap-2 bg-base-100 border-t border-base-300 overflow-x-auto">
+//             {smartReplies.map((reply, idx) => (
+//               <button
+//                 key={idx}
+//                 className="btn btn-sm btn-outline"
+//                 onClick={() => {
+//                   setInput(reply);
+//                   setSmartReplies([]);
+//                 }}
+//               >
+//                 {reply}
+//               </button>
+//             ))}
+//           </div>
+//         )}
+
+//         {/* Input Section */}
+//         <div className="p-2 border-t border-base-300 flex gap-2 bg-base-100 items-center">
+//           <input type="file" onChange={handleFileChange} className="file-input file-input-bordered" />
 //           <input
 //             className="input input-bordered flex-1"
 //             value={input}
 //             onChange={handleInputChange}
 //             onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-//             placeholder="Type a message or use voice 🎤"
+//             placeholder="Type a message"
 //           />
-
 //           <button
 //             className={`btn ${isListening ? "btn-error" : "btn-secondary"}`}
 //             onClick={toggleListening}
@@ -274,18 +722,11 @@
 //           >
 //             {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
 //           </button>
-
-//           <button
-//             className="btn btn-primary flex items-center gap-1"
-//             onClick={sendMessage}
-//             title="Send message"
-//           >
+//           <button className="btn btn-primary" onClick={sendMessage} title="Send message">
 //             <Send className="w-4 h-4" />
-//             <span className="hidden sm:inline">Send</span>
 //           </button>
 //         </div>
 
-//         {/* ✅ Video Call Component */}
 //         {showVideoCall && (
 //           <VideoCall
 //             currentUser={currentUser}
@@ -305,6 +746,12 @@
 
 
 
+
+
+
+
+
+
 import { useEffect, useRef, useState } from "react";
 import { useChatStore } from "../store/useChatStore";
 import useAuthUser from "../hooks/useAuthUser";
@@ -313,7 +760,7 @@ import { useParams } from "react-router";
 import { axiosInstance } from "../lib/axios";
 import ChatHeader from "./ChatHeader";
 import VideoCall from "./VideoCall";
-import { Mic, MicOff, Send, Paperclip } from "lucide-react";
+import { Mic, MicOff, Send } from "lucide-react";
 
 const ChatContainer = () => {
   const { id: selectedUserId } = useParams();
@@ -330,20 +777,20 @@ const ChatContainer = () => {
   } = useChatStore();
 
   const [input, setInput] = useState("");
-  const [file, setFile] = useState(null); // ✅ file state
+  const [file, setFile] = useState(null);
   const [showVideoCall, setShowVideoCall] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isFriendTyping, setIsFriendTyping] = useState(false);
+  const [smartReplies, setSmartReplies] = useState([]);
+  const [translationLanguage, setTranslationLanguage] = useState("english");
+  const [translations, setTranslations] = useState({});
+
   const recognitionRef = useRef(null);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
-  // 📂 Handle file change
-  const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
-  };
+  const handleFileChange = (e) => setFile(e.target.files[0]);
 
-  // 📤 Upload file to backend
   const uploadFile = async () => {
     if (!file) return null;
     const formData = new FormData();
@@ -354,43 +801,32 @@ const ChatContainer = () => {
     });
     const data = await res.json();
     setFile(null);
-    return data.url; // Cloudinary file URL
+    return data.url;
   };
 
-  
-  // 📤 Send message
   const sendMessage = async () => {
     if ((input.trim() || file) && currentUser && selectedUser) {
       let fileUrl = null;
-      if (file) {
-        fileUrl = await uploadFile();
-      }
+      if (file) fileUrl = await uploadFile();
 
       socket.emit("sendMessage", {
         senderId: currentUser._id,
         receiverId: selectedUser._id,
         text: input,
-        file: fileUrl, // ✅ sending file url
+        file: fileUrl,
       });
 
       setInput("");
       setFile(null);
-
-      socket.emit("typing", {
-        senderId: currentUser._id,
-        receiverId: selectedUser._id,
-        isTyping: false,
-      });
+      setSmartReplies([]);
     }
   };
 
-  // 🎤 Voice-to-text
   const toggleListening = () => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
-
     if (!SpeechRecognition) {
-      alert("Speech Recognition is not supported in this browser.");
+      alert("Speech Recognition not supported.");
       return;
     }
 
@@ -400,16 +836,12 @@ const ChatContainer = () => {
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
 
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
+      recognition.onresult = (e) => {
+        const transcript = e.results[0][0].transcript;
         setInput((prev) => prev + " " + transcript);
       };
 
-      recognition.onerror = (event) => {
-        console.error("Speech recognition error:", event.error);
-        setIsListening(false);
-      };
-
+      recognition.onerror = () => setIsListening(false);
       recognition.onend = () => {
         if (isListening) recognition.start();
       };
@@ -459,19 +891,52 @@ const ChatContainer = () => {
   useEffect(() => {
     if (!socket) return;
 
-    const handleReceive = (msg) => {
-      if (
+    const handleReceive = async (msg) => {
+      const isCurrentChat =
         (msg.senderId === currentUser._id && msg.receiverId === selectedUser?._id) ||
-        (msg.senderId === selectedUser?._id && msg.receiverId === currentUser._id)
-      ) {
+        (msg.senderId === selectedUser?._id && msg.receiverId === currentUser._id);
+
+      if (isCurrentChat) {
         addMessage(msg);
+
+        // Only for friend's latest message with text
+        if (msg.senderId === selectedUser?._id && msg.text) {
+          // 1. Smart Reply Suggestions
+          try {
+            const res = await fetch("http://localhost:5001/api/gemini/suggest-replies", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ message: msg.text }),
+            });
+            const data = await res.json();
+            setSmartReplies(data.suggestions || []);
+          } catch (err) {
+            console.error("Smart reply error:", err);
+          }
+
+          // 2. Translation (only if language is different)
+          if (translationLanguage !== "english") {
+            try {
+              const res = await fetch("http://localhost:5001/api/translate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: msg.text, targetLang: translationLanguage }),
+              });
+              const data = await res.json();
+              setTranslations((prev) => ({
+                ...prev,
+                [msg._id]: data.translated || "",
+              }));
+            } catch (err) {
+              console.error("Translation error:", err);
+            }
+          }
+        }
       }
     };
 
     const handleTyping = ({ senderId, isTyping }) => {
-      if (senderId === selectedUser?._id) {
-        setIsFriendTyping(isTyping);
-      }
+      if (senderId === selectedUser?._id) setIsFriendTyping(isTyping);
     };
 
     socket.on("receiveMessage", handleReceive);
@@ -481,7 +946,7 @@ const ChatContainer = () => {
       socket.off("receiveMessage", handleReceive);
       socket.off("typing", handleTyping);
     };
-  }, [socket, currentUser, selectedUser, addMessage]);
+  }, [socket, currentUser, selectedUser, translationLanguage, addMessage]);
 
   const handleVideoCall = () => {
     socket.emit("call-user", { from: currentUser._id, to: selectedUser._id });
@@ -491,14 +956,10 @@ const ChatContainer = () => {
   useEffect(() => {
     if (!socket) return;
     const handleIncomingCall = ({ from }) => {
-      if (selectedUser && from === selectedUser._id) {
-        setShowVideoCall(true);
-      }
+      if (selectedUser && from === selectedUser._id) setShowVideoCall(true);
     };
     socket.on("incoming-call", handleIncomingCall);
-    return () => {
-      socket.off("incoming-call", handleIncomingCall);
-    };
+    return () => socket.off("incoming-call", handleIncomingCall);
   }, [socket, selectedUser]);
 
   useEffect(() => {
@@ -510,9 +971,25 @@ const ChatContainer = () => {
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-base-100">
       <div className="relative flex flex-col h-full">
-        {/* Chat Header */}
+        {/* Header */}
         <div className="sticky top-0 z-20 bg-base-100 border-b border-base-300">
           <ChatHeader selectedUser={selectedUser} onVideoCall={handleVideoCall} />
+        </div>
+
+        {/* Language Selector */}
+        <div className="p-2 border-b border-base-300 bg-base-100">
+          <label className="text-sm mr-2">🌐 Translate to:</label>
+          <select
+            className="select select-bordered select-sm"
+            value={translationLanguage}
+            onChange={(e) => setTranslationLanguage(e.target.value)}
+          >
+            <option value="hindi">Hindi</option>
+            <option value="english">English</option>
+            <option value="spanish">Spanish</option>
+            <option value="bengali">Bengali</option>
+            <option value="french">French</option>
+          </select>
         </div>
 
         {/* Chat Messages */}
@@ -536,17 +1013,23 @@ const ChatContainer = () => {
                         : "bg-white text-black"
                     }`}
                   >
-                    {message.text && <span>{message.text}</span>}
+                    {message.text && (
+                      <div>
+                        <span>{message.text}</span>
+                        {message.senderId === selectedUser._id &&
+                          translations[message._id] &&
+                          translationLanguage !== "english" && (
+                            <div className="text-xs text-blue-600 mt-1 italic">
+                              🌐 {translationLanguage.toUpperCase()}: {translations[message._id]}
+                            </div>
+                          )}
+                      </div>
+                    )}
 
-                    {/* ✅ File rendering */}
                     {message.file && (
                       <a href={message.file} target="_blank" rel="noopener noreferrer">
                         {message.file.match(/\.(jpg|jpeg|png|gif)$/i) ? (
-                          <img
-                            src={message.file}
-                            alt="file"
-                            style={{ maxWidth: 200, marginTop: 8 }}
-                          />
+                          <img src={message.file} alt="file" style={{ maxWidth: 200, marginTop: 8 }} />
                         ) : (
                           <span className="text-blue-500 underline block mt-2">
                             📎 Download file
@@ -554,7 +1037,6 @@ const ChatContainer = () => {
                         )}
                       </a>
                     )}
-
                     <span className="block text-xs text-right mt-1">
                       {new Date(message.createdAt).toLocaleTimeString([], {
                         hour: "2-digit",
@@ -575,13 +1057,27 @@ const ChatContainer = () => {
           )}
         </div>
 
-        {/* Input section */}
+        {/* Smart Replies */}
+        {smartReplies.length > 0 && (
+          <div className="p-2 flex gap-2 bg-base-100 border-t border-base-300 overflow-x-auto">
+            {smartReplies.map((reply, idx) => (
+              <button
+                key={idx}
+                className="btn btn-sm btn-outline"
+                onClick={() => {
+                  setInput(reply);
+                  setSmartReplies([]);
+                }}
+              >
+                {reply}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Input Section */}
         <div className="p-2 border-t border-base-300 flex gap-2 bg-base-100 items-center">
-          <input
-            type="file"
-            onChange={handleFileChange}
-            className="file-input file-input-bordered"
-          />
+          <input type="file" onChange={handleFileChange} className="file-input file-input-bordered" />
           <input
             className="input input-bordered flex-1"
             value={input}
@@ -589,7 +1085,6 @@ const ChatContainer = () => {
             onKeyDown={(e) => e.key === "Enter" && sendMessage()}
             placeholder="Type a message"
           />
-
           <button
             className={`btn ${isListening ? "btn-error" : "btn-secondary"}`}
             onClick={toggleListening}
@@ -597,12 +1092,7 @@ const ChatContainer = () => {
           >
             {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
           </button>
-
-          <button
-            className="btn btn-primary"
-            onClick={sendMessage}
-            title="Send message"
-          >
+          <button className="btn btn-primary" onClick={sendMessage} title="Send message">
             <Send className="w-4 h-4" />
           </button>
         </div>

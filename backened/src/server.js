@@ -259,6 +259,10 @@ import uploadRoutes from "./routes/upload.route.js";
 
 import Message from "./models/Message.js";
 import { connectDB } from "./lib/db.js";
+import geminiRoutes from "./routes/gemini.route.js";
+import translateRoute from "./routes/translate.js";
+
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -280,6 +284,9 @@ app.use("/api/users", userRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/gemini", geminiRoutes);
+app.use("/api/translate", translateRoute);
+
 
 // ✅ Serve static frontend files in production
 if (process.env.NODE_ENV === "production") {
@@ -309,6 +316,8 @@ io.on("connection", (socket) => {
       userId = id;
       onlineUsers.add(userId);
       userSocketMap[userId] = socket.id;
+         console.log(`✅ User ${userId} connected with socket ID ${socket.id}`);
+
       io.emit("online-users", Array.from(onlineUsers));
     });
   } else {
