@@ -261,7 +261,7 @@ import Message from "./models/Message.js";
 import { connectDB } from "./lib/db.js";
 import geminiRoutes from "./routes/gemini.route.js";
 import translateRoute from "./routes/translate.js";
-
+import streamRoutes from "./routes/stream.route.js";
 
 
 const app = express();
@@ -286,8 +286,7 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/gemini", geminiRoutes);
 app.use("/api/translate", translateRoute);
-
-
+app.use("/api/stream", streamRoutes);
 // ✅ Serve static frontend files in production
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));
@@ -296,7 +295,7 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
-// --- ✅ SOCKET.IO Setup ---
+// --- ✅ SOCKET.IO Setup done ---
 const server = createServer(app);
 const io = new Server(server, {
   cors: {

@@ -22,7 +22,7 @@ const useOnlineUsers = () => {
   return useQuery({
     queryKey: ["onlineUsers"],
     queryFn: async () => {
-      const res = await fetch("http://localhost:5001/online-users");
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/online-users`);
       const data = await res.json();
       return data.online;
     },

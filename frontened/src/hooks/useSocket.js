@@ -5,7 +5,7 @@ export const useSocket = (userId) => {
   const socketRef = useRef();
 
   useEffect(() => {
-    socketRef.current = io("http://localhost:5001");
+    socketRef.current = io(`${import.meta.env.VITE_BACKEND_URL}`);
     if (userId) {
       socketRef.current.emit("join", userId);
     }

@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import io from "socket.io-client";
 
-const socket = io("http://localhost:5001");
+const socket = io(`${import.meta.env.VITE_BACKEND_URL}`);
 // const socket = io("https://c7d3-2409-40e5-11e6-731b-1878-7d8-9556-91d9.ngrok-free.app");
 
 
