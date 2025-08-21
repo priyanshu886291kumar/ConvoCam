@@ -1,0 +1,7 @@
+Correct!
+You are using Express (a web framework) to build your backend API, but it runs on Node.js (the JavaScript runtime).
+
+Node.js: Executes JavaScript code outside the browser, handles server logic, file system, etc.
+Express: A library for Node.js that makes it easy to build web servers and APIs.
+So, your backend is a Node.js application that uses Express to handle HTTP requests, routing, middleware, etc.
+

@@ -48,12 +48,12 @@ app.use("/api/translate", translateRoute);
 app.use("/api/stream", streamRoutes);
 
 // ✅ Serve static frontend files in production
-if (process.env.NODE_ENV === "production") {
-  app.use(express.static(path.join(__dirname, "../frontend/dist")));
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
-  });
-}
+// if (process.env.NODE_ENV === "production") {
+//   app.use(express.static(path.join(__dirname, "../frontend/dist")));
+//   app.get("*", (req, res) => {
+//     res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
+//   });
+// }
 
 // --- ✅ SOCKET.IO Setup done ---
 const server = createServer(app);
@@ -149,6 +149,10 @@ io.on("connection", (socket) => {
 // ✅ API to fetch online users
 app.get("/online-users", (req, res) => {
   res.json({ online: Array.from(onlineUsers) });
+});
+
+app.get("/", (req, res) => {
+  res.send("✅ Backend is live and DB connected!");
 });
 
 // ✅ Start server
