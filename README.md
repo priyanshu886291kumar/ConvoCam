@@ -76,7 +76,7 @@ cd ConvoCam
 
 ---
 
-## 🌐 Deployment
+## 🌐 Deployment Part
 
 - **Frontend:** Vercel ([see deployed link](https://convo-cam-git-main-priyanshu886291kumars-projects.vercel.app/login))
 - 
