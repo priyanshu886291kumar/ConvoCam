@@ -19,8 +19,8 @@
 
 
 
-// do not delet this commentign for render working only
-// import axios from "axios";
+// do not delete this comment for render working only
+import axios from "axios";
 
 const BASE_URL =
   import.meta.env.VITE_BACKEND_URL
