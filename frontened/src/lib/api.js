@@ -58,23 +58,3 @@ export async function acceptFriendRequest(requestId) {
   const response = await axiosInstance.put(`/users/friend-request/${requestId}/accept`);
   return response.data;
 }
-
-export const getStreamToken = async () => {
-  const authUserStr = localStorage.getItem("authUser");
-  console.log("authUser from localStorage:", authUserStr);
-  if (!authUserStr) return { error: "No authUser in localStorage" }; // Always return an object
-  const authUser = JSON.parse(authUserStr);
-  if (!authUser?._id) {
-    console.log("authUser missing _id:", authUser);
-    return { error: "authUser missing _id" }; // Always return an object
-  }
-  const res = await axiosInstance.post("/stream/token", {
-    user: {
-      id: authUser._id,
-      name: authUser.fullName,
-      image: authUser.profilePic,
-    }
-  });
-  console.log("Stream token response:", res.data);
-  return res.data;
-};

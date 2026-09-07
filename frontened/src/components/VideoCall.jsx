@@ -76,8 +76,8 @@ peerConnection.current = new RTCPeerConnection({
     })
 
     return () => {
-      if (localVideo.current && localVideo.current.srcObject) {
-        localVideo.current.srcObject.getTracks().forEach(track => track.stop());
+      if (localStream) {
+        localStream.getTracks().forEach((track) => track.stop());
       }
       if (peerConnection.current) {
         peerConnection.current.close();
@@ -87,7 +87,6 @@ peerConnection.current = new RTCPeerConnection({
       socket.off("offer");
       socket.off("answer");
     };
-    // eslint-disable-next-line
   }, [currentUser, remoteUser]);
 
   return (

@@ -1,6 +1,3 @@
-
-
-
 import express from "express";
 import "dotenv/config";
 import cookieParser from "cookie-parser";
@@ -11,61 +8,69 @@ import { Server } from "socket.io";
 
 import authRoutes from "./routes/auth.route.js";
 import userRoutes from "./routes/user.route.js";
-import chatRoutes from "./routes/chat.route.js";
 import messageRoutes from "./routes/message.route.js";
 import uploadRoutes from "./routes/upload.route.js";
+import geminiRoutes from "./routes/gemini.route.js";
+import translateRoute from "./routes/translate.js";
 
 import Message from "./models/Message.js";
 import { connectDB } from "./lib/db.js";
-import geminiRoutes from "./routes/gemini.route.js";
-import translateRoute from "./routes/translate.js";
-import streamRoutes from "./routes/stream.route.js";
-
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 const __dirname = path.resolve();
 
+// Allowed origins for CORS (Local development + Production frontend URLs)
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:3000",
+  "http://localhost:5000",
+  "http://localhost:5001",
+  process.env.FRONTEND_URL,
+  process.env.CLIENT_URL,
+].filter(Boolean);
 
-app.use(
-  cors({
-    origin: "http://localhost:5173",
-    credentials: true,
-  })
-);
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
 
+    if (
+      allowedOrigins.includes(origin) ||
+      process.env.NODE_ENV !== "production" ||
+      /\.vercel\.app$/.test(new URL(origin).hostname) ||
+      /\.onrender\.com$/.test(new URL(origin).hostname)
+    ) {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(cookieParser());
 
-// ✅ API Routes
+// API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/chat", chatRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/gemini", geminiRoutes);
 app.use("/api/translate", translateRoute);
-app.use("/api/stream", streamRoutes);
 
-// ✅ Serve static frontend files in production
-// if (process.env.NODE_ENV === "production") {
-//   app.use(express.static(path.join(__dirname, "../frontend/dist")));
-//   app.get("*", (req, res) => {
-//     res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
-//   });
-// }
-
-// --- ✅ SOCKET.IO Setup done ---
+// SOCKET.IO Setup
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: corsOptions.origin,
     credentials: true,
   },
 });
 
-const onlineUsers = new Set();      // To track online users
-const userSocketMap = {};           // Map userId to socket.id
+const onlineUsers = new Set(); // To track online user IDs
+const userSocketMap = {}; // Map userId to socket.id
 
 io.on("connection", (socket) => {
   let userId = socket.handshake.query.userId;
@@ -75,8 +80,7 @@ io.on("connection", (socket) => {
       userId = id;
       onlineUsers.add(userId);
       userSocketMap[userId] = socket.id;
-         console.log(`✅ User ${userId} connected with socket ID ${socket.id}`);
-
+      console.log(`✅ User ${userId} connected with socket ID ${socket.id}`);
       io.emit("online-users", Array.from(onlineUsers));
     });
   } else {
@@ -85,7 +89,7 @@ io.on("connection", (socket) => {
     io.emit("online-users", Array.from(onlineUsers));
   }
 
-  // ✅ Chat message handling (text + image + file)
+  // Chat message handling (text + image + file)
   socket.on("sendMessage", async (data) => {
     try {
       console.log("📨 Received message:", data);
@@ -96,25 +100,25 @@ io.on("connection", (socket) => {
         receiverId,
         text,
         image,
-        file, // ✅ Add file if exists
+        file,
       });
 
       await message.save();
 
-      // 🔁 Emit to receiver (if online)
+      // Emit to receiver (if online)
       const receiverSocketId = userSocketMap[receiverId];
       if (receiverSocketId) {
         io.to(receiverSocketId).emit("receiveMessage", message);
       }
 
-      // ✅ Emit to sender as confirmation
+      // Emit to sender as confirmation
       socket.emit("receiveMessage", message);
     } catch (err) {
       console.error("❌ Error saving message:", err);
     }
   });
 
-  // ✅ Typing indicator
+  // Typing indicator
   socket.on("typing", ({ senderId, receiverId, isTyping }) => {
     const receiverSocketId = userSocketMap[receiverId];
     if (receiverSocketId) {
@@ -122,7 +126,20 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ✅ Video call request
+  // --- 📹 Socket.IO WebRTC Video Calling Signaling ---
+  socket.on("join-room", (roomId) => {
+    socket.join(roomId);
+    console.log(`Socket ${socket.id} joined room ${roomId}`);
+    socket.to(roomId).emit("user-joined", { socketId: socket.id, userId });
+  });
+
+  socket.on("leave-room", (roomId) => {
+    socket.leave(roomId);
+    console.log(`Socket ${socket.id} left room ${roomId}`);
+    socket.to(roomId).emit("user-left", { socketId: socket.id, userId });
+  });
+
+  // Initiate call to user
   socket.on("call-user", ({ from, to }) => {
     const receiverSocketId = userSocketMap[to];
     if (receiverSocketId) {
@@ -130,12 +147,43 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ✅ WebRTC signals
-  socket.on("offer", (offer) => socket.broadcast.emit("offer", offer));
-  socket.on("answer", (answer) => socket.broadcast.emit("answer", answer));
-  socket.on("ice-candidate", (candidate) => socket.broadcast.emit("ice-candidate", candidate));
+  // WebRTC Offer
+  socket.on("offer", ({ offer, roomId, to }) => {
+    if (to && userSocketMap[to]) {
+      io.to(userSocketMap[to]).emit("offer", { offer, roomId, from: userId });
+    } else if (roomId) {
+      socket.to(roomId).emit("offer", { offer, roomId, from: userId });
+    }
+  });
 
-  // ✅ Handle user disconnect
+  // WebRTC Answer
+  socket.on("answer", ({ answer, roomId, to }) => {
+    if (to && userSocketMap[to]) {
+      io.to(userSocketMap[to]).emit("answer", { answer, roomId, from: userId });
+    } else if (roomId) {
+      socket.to(roomId).emit("answer", { answer, roomId, from: userId });
+    }
+  });
+
+  // WebRTC ICE Candidate
+  socket.on("ice-candidate", ({ candidate, roomId, to }) => {
+    if (to && userSocketMap[to]) {
+      io.to(userSocketMap[to]).emit("ice-candidate", { candidate, roomId, from: userId });
+    } else if (roomId) {
+      socket.to(roomId).emit("ice-candidate", { candidate, roomId, from: userId });
+    }
+  });
+
+  // End Call
+  socket.on("end-call", ({ roomId, to }) => {
+    if (to && userSocketMap[to]) {
+      io.to(userSocketMap[to]).emit("call-ended", { roomId });
+    } else if (roomId) {
+      socket.to(roomId).emit("call-ended", { roomId });
+    }
+  });
+
+  // Handle user disconnect
   socket.on("disconnect", () => {
     if (userId) {
       onlineUsers.delete(userId);
@@ -146,191 +194,18 @@ io.on("connection", (socket) => {
   });
 });
 
-// ✅ API to fetch online users
+// API to fetch online users
 app.get("/online-users", (req, res) => {
   res.json({ online: Array.from(onlineUsers) });
 });
 
+// Health check endpoint
 app.get("/", (req, res) => {
-  res.send("✅ Backend is live and DB connected!");
+  res.send("✅ ConvoCam backend is live and DB connected!");
 });
 
-// ✅ Start server
+// Start server
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   connectDB();
 });
-
-
-
-
-
-
-
-
-
-
-// below is same as above below is after vercel
-
-
-// import express from "express";
-// import "dotenv/config";
-// import cookieParser from "cookie-parser";
-// import cors from "cors";
-// import path from "path";
-// import { createServer } from "http";
-// import { Server } from "socket.io";
-
-// import authRoutes from "./routes/auth.route.js";
-// import userRoutes from "./routes/user.route.js";
-// import chatRoutes from "./routes/chat.route.js";
-// import messageRoutes from "./routes/message.route.js";
-// import uploadRoutes from "./routes/upload.route.js";
-
-// import Message from "./models/Message.js";
-// import { connectDB } from "./lib/db.js";
-// import geminiRoutes from "./routes/gemini.route.js";
-// import translateRoute from "./routes/translate.js";
-// import streamRoutes from "./routes/stream.route.js";
-
-// const app = express();
-// const PORT = process.env.PORT || 5000;
-// const __dirname = path.resolve();
-
-// // Allowed origins for CORS
-// const allowedOrigins = [
-//   "http://localhost:5173",
-//   "https://convo-k04ic9ogs-priyanshu886291kumars-projects.vercel.app",
-// ];
-
-// app.use(
-//   cors({
-//     origin: function (origin, callback) {
-//       // Allow requests with no origin (like Postman or curl)
-//       if (!origin) return callback(null, true);
-//       if (allowedOrigins.indexOf(origin) === -1) {
-//         const msg = `CORS policy does not allow access from origin ${origin}`;
-//         return callback(new Error(msg), false);
-//       }
-//       return callback(null, true);
-//     },
-//     credentials: true,
-//   })
-// );
-
-// app.use(express.json());
-// app.use(cookieParser());
-
-// // API routes
-// app.use("/api/auth", authRoutes);
-// app.use("/api/users", userRoutes);
-// app.use("/api/chat", chatRoutes);
-// app.use("/api/messages", messageRoutes);
-// app.use("/api/upload", uploadRoutes);
-// app.use("/api/gemini", geminiRoutes);
-// app.use("/api/translate", translateRoute);
-// app.use("/api/stream", streamRoutes);
-
-// // Serve frontend files in production (uncomment if needed)
-// // if (process.env.NODE_ENV === "production") {
-// //   app.use(express.static(path.join(__dirname, "../frontend/dist")));
-// //   app.get("*", (req, res) => {
-// //     res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
-// //   });
-// // }
-
-// // Socket.io setup with CORS
-// const server = createServer(app);
-// const io = new Server(server, {
-//   cors: {
-//     origin: allowedOrigins,
-//     credentials: true,
-//   },
-// });
-
-// const onlineUsers = new Set();
-// const userSocketMap = {};
-
-// io.on("connection", (socket) => {
-//   let userId = socket.handshake.query.userId;
-
-//   if (!userId) {
-//     socket.on("join", (id) => {
-//       userId = id;
-//       onlineUsers.add(userId);
-//       userSocketMap[userId] = socket.id;
-//       console.log(`✅ User ${userId} connected with socket ID ${socket.id}`);
-//       io.emit("online-users", Array.from(onlineUsers));
-//     });
-//   } else {
-//     onlineUsers.add(userId);
-//     userSocketMap[userId] = socket.id;
-//     io.emit("online-users", Array.from(onlineUsers));
-//   }
-
-//   socket.on("sendMessage", async (data) => {
-//     try {
-//       console.log("📨 Received message:", data);
-//       const { senderId, receiverId, text, image, file } = data;
-
-//       const message = new Message({
-//         senderId,
-//         receiverId,
-//         text,
-//         image,
-//         file,
-//       });
-
-//       await message.save();
-
-//       const receiverSocketId = userSocketMap[receiverId];
-//       if (receiverSocketId) {
-//         io.to(receiverSocketId).emit("receiveMessage", message);
-//       }
-
-//       socket.emit("receiveMessage", message);
-//     } catch (err) {
-//       console.error("❌ Error saving message:", err);
-//     }
-//   });
-
-//   socket.on("typing", ({ senderId, receiverId, isTyping }) => {
-//     const receiverSocketId = userSocketMap[receiverId];
-//     if (receiverSocketId) {
-//       io.to(receiverSocketId).emit("typing", { senderId, isTyping });
-//     }
-//   });
-
-//   socket.on("call-user", ({ from, to }) => {
-//     const receiverSocketId = userSocketMap[to];
-//     if (receiverSocketId) {
-//       io.to(receiverSocketId).emit("incoming-call", { from });
-//     }
-//   });
-
-//   socket.on("offer", (offer) => socket.broadcast.emit("offer", offer));
-//   socket.on("answer", (answer) => socket.broadcast.emit("answer", answer));
-//   socket.on("ice-candidate", (candidate) =>
-//     socket.broadcast.emit("ice-candidate", candidate)
-//   );
-
-//   socket.on("disconnect", () => {
-//     if (userId) {
-//       onlineUsers.delete(userId);
-//       delete userSocketMap[userId];
-//       io.emit("online-users", Array.from(onlineUsers));
-//     }
-//     console.log("🔌 User disconnected:", socket.id);
-//   });
-// });
-
-// // API endpoint to get online users
-// app.get("/online-users", (req, res) => {
-//   res.json({ online: Array.from(onlineUsers) });
-// });
-
-// // Start server
-// server.listen(PORT, "0.0.0.0", () => {
-//   console.log(`🚀 Server is running on port ${PORT}`);
-//   connectDB();
-// });

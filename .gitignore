@@ -1,17 +1,25 @@
-# Ignore backend dependencies and environment config
-backened/node_modules/
-# backened/.env
+# Ignore backend and frontend dependencies
+**/node_modules/
+node_modules/
 
-# Ignore learn folder
+# Ignore environment configs with secrets (keep .env.example)
+**/.env
+**/.env.local
+**/.env.*.local
+!**/.env.example
+
+# Ignore learn folder and temporary docs
 learn/
-
-# Ignore build output (if any at root or other folders)
-dist/
-build/
-
-# Ignore log files
-*.log
-
-# Ignore specific files
 backened.txt
 frontened.txt
+
+# Ignore build outputs
+dist/
+build/
+.dist/
+.output/
+
+# Ignore logs and system files
+*.log
+.DS_Store
+Thumbs.db

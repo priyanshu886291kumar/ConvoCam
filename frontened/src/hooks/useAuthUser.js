@@ -5,7 +5,9 @@ const useAuthUser = () => {
   const authUser = useQuery({
     queryKey: ["authUser"],
     queryFn: getAuthUser,
-    retry: false, // auth check
+    retry: false,
+    refetchOnWindowFocus: false, // Prevents kicking user to login when switching to terminal
+    staleTime: 1000 * 60 * 30, // 30 min cache
   });
 
   return { isLoading: authUser.isLoading, authUser: authUser.data?.user };

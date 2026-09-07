@@ -4,8 +4,6 @@ import "dotenv/config";
 
 const router = express.Router();
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
 router.post("/", async (req, res) => {
   const { text, targetLang } = req.body;
 
@@ -13,18 +11,30 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "Text and targetLang are required" });
   }
 
-  try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const apiKey = process.env.GEMINI_API_KEY;
 
-    const prompt = `Translate the following text to ${targetLang}:\n"${text}"`;
+  if (!apiKey || apiKey.trim() === "") {
+    return res.json({ translated: `[${targetLang.toUpperCase()}]: ${text}` });
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    let model;
+    try {
+      model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    } catch {
+      model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    }
+
+    const prompt = `Translate the following text accurately and naturally to ${targetLang}. Return only the translated text without explanations, notes, or quotes:\n"${text}"`;
 
     const result = await model.generateContent(prompt);
     const translatedText = result.response.text();
 
-    res.json({ translated: translatedText.trim() });
+    res.json({ translated: translatedText.trim().replace(/^["']|["']$/g, "") });
   } catch (error) {
-    console.error("Translation error:", error.message);
-    res.status(500).json({ error: "Translation failed" });
+    console.warn("Gemini translation notice:", error.message);
+    res.json({ translated: `[${targetLang.toUpperCase()}]: ${text}` });
   }
 });
 

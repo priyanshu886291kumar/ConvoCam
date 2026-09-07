@@ -1,18 +1,39 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 
+let socketInstance = null;
+
 export const useSocket = (userId) => {
-  const socketRef = useRef();
+  const [socket, setSocket] = useState(socketInstance);
 
   useEffect(() => {
-    socketRef.current = io(`${import.meta.env.VITE_BACKEND_URL}`);
-    if (userId) {
-      socketRef.current.emit("join", userId);
+    if (!socketInstance) {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5001";
+      socketInstance = io(backendUrl, {
+        transports: ["websocket", "polling"],
+        withCredentials: true,
+        autoConnect: true,
+      });
     }
-    return () => {
-      socketRef.current.disconnect();
-    };
+
+    if (userId) {
+      if (socketInstance.connected) {
+        socketInstance.emit("join", userId);
+      } else {
+        const onConnect = () => {
+          socketInstance.emit("join", userId);
+        };
+        socketInstance.on("connect", onConnect);
+        return () => {
+          socketInstance.off("connect", onConnect);
+        };
+      }
+    }
+
+    setSocket(socketInstance);
   }, [userId]);
 
-  return socketRef.current;
+  return socketInstance || socket;
 };
+
+export const getSocket = () => socketInstance;

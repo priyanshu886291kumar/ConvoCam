@@ -18,8 +18,9 @@ import useAuthUser from "../hooks/useAuthUser";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { completeOnboarding } from "../lib/api";
-import { LoaderIcon, MapPinIcon, ShipWheelIcon, ShuffleIcon } from "lucide-react";
+import { CameraIcon, LoaderIcon, MapPinIcon, ShipWheelIcon, ShuffleIcon } from "lucide-react";
 import { LANGUAGES } from "../constants";
+import Avatar from "../components/Avatar";
 
 const OnboardingPage = () => {
   const { authUser } = useAuthUser();
@@ -36,27 +37,31 @@ const OnboardingPage = () => {
 
   const { mutate: onboardingMutation, isPending } = useMutation({
     mutationFn: completeOnboarding,
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success("Profile onboarded successfully");
+      if (data && data.user) {
+        localStorage.setItem("authUser", JSON.stringify(data.user));
+      }
       queryClient.invalidateQueries({ queryKey: ["authUser"] });
     },
 
     onError: (error) => {
-      toast.error(error.response.data.message);
+      toast.error(error?.response?.data?.message || "Onboarding failed");
     },
   });
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
     onboardingMutation(formState);
   };
 
   const handleRandomAvatar = () => {
-    const idx = Math.floor(Math.random() * 100) + 1; // 1-100 included
-    const randomAvatar = `https://avatar.iran.liara.run/public/${idx}.png`;
+    const randomSeed = Math.random().toString(36).substring(2, 10);
+    const styles = ["avataaars", "bottts", "lorelei", "adventurer", "micah", "fun-emoji", "notionists", "personas"];
+    const randomStyle = styles[Math.floor(Math.random() * styles.length)];
+    const randomAvatar = `https://api.dicebear.com/9.x/${randomStyle}/svg?seed=${randomSeed}`;
 
-    setFormState({ ...formState, profilePic: randomAvatar });
+    setFormState((prev) => ({ ...prev, profilePic: randomAvatar }));
     toast.success("Random profile picture generated!");
   };
 
@@ -69,25 +74,17 @@ const OnboardingPage = () => {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* PROFILE PIC CONTAINER */}
             <div className="flex flex-col items-center justify-center space-y-4">
-              {/* IMAGE PREVIEW */}
-              <div className="size-32 rounded-full bg-base-300 overflow-hidden">
-                {formState.profilePic ? (
-                  <img
-                    src={formState.profilePic}
-                    alt="Profile Preview"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full">
-                    <CameraIcon className="size-12 text-base-content opacity-40" />
-                  </div>
-                )}
-              </div>
+              <Avatar
+                src={formState.profilePic}
+                name={formState.fullName || "User"}
+                size="2xl"
+                ring={true}
+              />
 
               {/* Generate Random Avatar BTN */}
               <div className="flex items-center gap-2">
-                <button type="button" onClick={handleRandomAvatar} className="btn btn-accent">
-                  <ShuffleIcon className="size-4 mr-2" />
+                <button type="button" onClick={handleRandomAvatar} className="btn btn-accent btn-sm sm:btn-md gap-2">
+                  <ShuffleIcon className="size-4" />
                   Generate Random Avatar
                 </button>
               </div>
