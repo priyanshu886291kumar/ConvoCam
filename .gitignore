@@ -12,6 +12,7 @@ node_modules/
 learn/
 backened.txt
 frontened.txt
+WEBRTC_INTERVIEW_AND_DEMO_GUIDE.md
 
 # Ignore build outputs
 dist/
