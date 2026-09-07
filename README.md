@@ -1,5 +1,10 @@
 # ConvoCam 🎥💬
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-black?style=for-the-badge&logo=vercel)](https://convo-cam-hm9e.vercel.app/)
+[![Backend](https://img.shields.io/badge/Backend-Render-46E3B7?style=for-the-badge&logo=render&logoColor=white)](https://convocam-backend.onrender.com)
+
+🔗 **Live Application URL:** [https://convo-cam-hm9e.vercel.app/](https://convo-cam-hm9e.vercel.app/)
+
 ConvoCam is a full-stack real-time communication and language exchange web application. It connects language learners across the world, offering real-time messaging, AI-powered smart replies, real-time message translation, speech-to-text voice typing, file sharing, and 1-on-1 video calling powered purely by **Socket.IO and WebRTC** (No third-party Stream service required!).
 
 ---
@@ -145,8 +150,8 @@ npm run dev
    - `CLOUDINARY_CLOUD_NAME` = `your_cloudinary_cloud_name`
    - `CLOUDINARY_API_KEY` = `your_cloudinary_api_key`
    - `CLOUDINARY_API_SECRET` = `your_cloudinary_api_secret`
-   - `FRONTEND_URL` = `https://your-frontend-app.vercel.app`
-   - `CLIENT_URL` = `https://your-frontend-app.vercel.app`
+   - `FRONTEND_URL` = `https://convo-cam-hm9e.vercel.app`
+   - `CLIENT_URL` = `https://convo-cam-hm9e.vercel.app`
 
 ---
 
@@ -156,8 +161,8 @@ npm run dev
 2. Set the **Root Directory** to `ConvoCam/frontened` (or `frontened`).
 3. Framework Preset: **Vite**.
 4. In **Environment Variables**, add:
-   - `VITE_BACKEND_URL` = `https://your-backend.onrender.com`
-5. Click **Deploy**.
+   - `VITE_BACKEND_URL` = `https://convocam-backend.onrender.com`
+5. Click **Deploy**. (Live at: [https://convo-cam-hm9e.vercel.app/](https://convo-cam-hm9e.vercel.app/))
 
 ---
 
